@@ -130,17 +130,21 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     @Override
     void init(Channel channel) {
+        //设置到ServerBootstrap中的Option设置到channel的config中
         setChannelOptions(channel, newOptionsArray(), logger);
+        //设置一些属性到channel，用法与Option一样
         setAttributes(channel, newAttributesArray());
 
         ChannelPipeline p = channel.pipeline();
 
+        //子Channel(SocketChannel)的配置
         final EventLoopGroup currentChildGroup = childGroup;
         final ChannelHandler currentChildHandler = childHandler;
         final Entry<ChannelOption<?>, Object>[] currentChildOptions = newOptionsArray(childOptions);
         final Entry<AttributeKey<?>, Object>[] currentChildAttrs = newAttributesArray(childAttrs);
         final Collection<ChannelInitializerExtension> extensions = getInitializerExtensions();
 
+        //将ServerBootstrap中的handler设置到ChannelPipeline的最后
         p.addLast(new ChannelInitializer<Channel>() {
             @Override
             public void initChannel(final Channel ch) {
@@ -150,6 +154,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
                     pipeline.addLast(handler);
                 }
 
+                //同时，又向ChannelPipeline的最后添加了一个叫作ServerBootstrapAcceptor的Handler
                 ch.eventLoop().execute(new Runnable() {
                     @Override
                     public void run() {

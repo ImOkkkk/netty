@@ -284,6 +284,28 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
         return doBind(ObjectUtil.checkNotNull(localAddress, "localAddress"));
     }
 
+    /**
+     * 1.initAndRegister()
+     * - channelFactory.newChannel()
+     *   - 通过反射创建一个NioServerSocketChannel
+     *   - 将Java原生Channel绑定到NettyChanel
+     *   - 注册Accept事件
+     *   - 为Channel分配id
+     *   - 为Channel创建unsafe
+     *   - 为Channel创建ChannelPipeline(默认head<=>tail的双向链表)
+     * - init(Channel)
+     *   - 把ServerBootstrap中的配置设置到Channel中
+     *   - 添加ServerBootStrapAcceptor这个Handler
+     * - register(channel)
+     *   - 把Channel绑定到一个EventLoop上
+     *   - 把Java原生Channel、Netty的Channel、Selector绑定SelectionKey中
+     *   - 触发Register相关的事件
+     *2.doBind0()
+     * - 通过Java原生Channel绑定到一个本地地址上
+     * @param localAddress
+     * @return
+     */
+
     private ChannelFuture doBind(final SocketAddress localAddress) {
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
@@ -323,6 +345,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            //反射创建一个channel 如NioServerSocketChannel
             channel = channelFactory.newChannel();
             init(channel);
         } catch (Throwable t) {
@@ -373,10 +396,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
         // This method is invoked before channelRegistered() is triggered.  Give user handlers a chance to set up
         // the pipeline in its channelRegistered() implementation.
+        //异步执行
         channel.eventLoop().execute(new Runnable() {
             @Override
             public void run() {
                 if (regFuture.isSuccess()) {
+                    //调用channel的bind方法
                     channel.bind(localAddress, promise).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
                 } else {
                     promise.setFailure(regFuture.cause());

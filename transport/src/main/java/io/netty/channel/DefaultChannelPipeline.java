@@ -93,6 +93,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         succeededFuture = new SucceededChannelFuture(channel, null);
         voidPromise =  new VoidChannelPromise(channel, true);
 
+        //双向链表
         tail = new TailContext(this);
         head = new HeadContext(this);
 
@@ -967,8 +968,11 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return this;
     }
 
+    //此时pipeline中的Handler为head<=>LoggingHandler<=>ServerBootstrapAcceptor<=>tail
+    //出站的pipeline实际为tail=>LoggingHandler=>head
     @Override
     public final ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise) {
+        //从尾开始调用，也就是outbound
         return tail.bind(localAddress, promise);
     }
 

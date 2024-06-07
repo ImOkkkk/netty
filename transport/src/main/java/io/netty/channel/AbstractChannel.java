@@ -68,8 +68,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      *        the parent of this channel. {@code null} if there's no parent.
      */
     protected AbstractChannel(Channel parent) {
+        //此时parent为null
         this.parent = parent;
         id = newId();
+        //Netty自己的Unsafe
         unsafe = newUnsafe();
         pipeline = newChannelPipeline();
     }
@@ -256,6 +258,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     @Override
     public ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise) {
+        //调用pipeline的bind()方法
         return pipeline.bind(localAddress, promise);
     }
 
@@ -460,6 +463,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             return remoteAddress0();
         }
 
+        //1.把 Channel 绑定到一个 EventLoop 上;
+        //2.把 Java 原生 Channel、Netty 的 Channel、Selector 绑定到 SelectionKey 中;
+        //3.触发 Register 相关的事件;
         @Override
         public final void register(EventLoop eventLoop, final ChannelPromise promise) {
             ObjectUtil.checkNotNull(eventLoop, "eventLoop");
@@ -473,8 +479,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            //把传入的eventLoop绑定到Channel
             AbstractChannel.this.eventLoop = eventLoop;
 
+            //判断当前线程是否和EventLoop线程是同一个
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
@@ -510,12 +518,19 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
                 // Ensure we call handlerAdded(...) before we actually notify the promise. This is needed as the
                 // user may already fire events through the pipeline in the ChannelFutureListener.
+                //触发添加Handler的回调，其中pipeline.addLast(ChannelInitializer)处理在这一步完成
+                //这一步之后pipeline里面应该是head<=>LoggingHandler<=>tail
+                //而ServerBootstrapAcceptor还没有加入到pipeline中
+                //因为设置了使用EventLoop的线程执行，当前线程就是EventLoop的线程
+                //所以添加ServerBootstrapAcceptor会在当前任务执行完毕才执行
                 pipeline.invokeHandlerAddedIfNeeded();
 
                 safeSetSuccess(promise);
+                //实际是调用各个ChannelHandler的channelRegistered
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
+                //还未绑定到具体的地址，所以还未激活
                 if (isActive()) {
                     if (firstRegistration) {
                         pipeline.fireChannelActive();
@@ -558,6 +573,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             boolean wasActive = isActive();
             try {
+                //绑定地址
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
@@ -565,6 +581,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            //成功激活，调用pipeline.fireChannelActive()方法
             if (!wasActive && isActive()) {
                 invokeLater(new Runnable() {
                     @Override
@@ -574,6 +591,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 });
             }
 
+            //设置promise为成功状态
             safeSetSuccess(promise);
         }
 
